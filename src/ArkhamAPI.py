@@ -5,6 +5,7 @@ import base64
 import uuid
 import requests
 import json
+import random
 from loguru import logger
 
 class ArkhamAPI:
@@ -13,15 +14,42 @@ class ArkhamAPI:
         self.api_secret = api_secret
         self.base_url = "https://arkm.com/api"
         self.proxies = proxies
-        logger.add("arkham_api.log", rotation="1 day", level="INFO")  # Логирование в файл
+        logger.add("arkham_api.log", rotation="1 day", level="INFO")
 
     def generate_signature(self, method, path, body, expires):
         message = f"{self.api_key}{expires}{method}{path}{body}"
         secret = base64.b64decode(self.api_secret)
         signature = hmac.new(secret, message.encode(), hashlib.sha256).digest()
         signature_b64 = base64.b64encode(signature).decode()
-        logger.debug(f"Generated signature for {path}: {signature_b64}")
+        logger.debug(f"Generated signature for {path}")
         return signature_b64
+    
+    def get_open_orders(self, subaccount_id=0):
+        path = "/orders"
+        url = f"{self.base_url}{path}"
+        params = {}
+        
+        if subaccount_id:
+            params['subaccountId'] = subaccount_id
+        
+        method = "GET"
+        expires = str(int(time.time() * 1000000) + 300000000)
+        signature = self.generate_signature(method, path, '', expires)
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Arkham-Api-Key": self.api_key,
+            "Arkham-Expires": expires,
+            "Arkham-Signature": signature
+        }
+
+        response = requests.get(url, headers=headers, params=params, proxies=self.proxies)
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"Error fetching orders: {response.status_code} - {response.text}")
+            return None
 
     def get_market_price(self, symbol):
         path = f"/public/ticker?symbol={symbol}"
@@ -77,11 +105,16 @@ class ArkhamAPI:
             logger.error(f"Error fetching balance for {symbol}: {response.status_code} - {response.text}")
             return None
 
-    def create_order(self, price, size, side, symbol, subaccount_id=0, post_only=False):
+    def create_order(self, price, size, side, symbol, type, subaccount_id=0, post_only=False):
         path = "/orders/new"
         url = f"{self.base_url}{path}"
         method = "POST"
         client_order_id = str(uuid.uuid4())
+
+        order_type = random.choice(["limitGtc", "market"])
+        
+        if order_type == "market":
+            price = 0
 
         body = {
             "clientOrderId": client_order_id,
@@ -91,7 +124,7 @@ class ArkhamAPI:
             "size": str(size),
             "subaccountId": subaccount_id,
             "symbol": symbol,
-            "type": "market"
+            "type": order_type
         }
 
         body_json = json.dumps(body)
@@ -105,7 +138,7 @@ class ArkhamAPI:
             "Arkham-Signature": signature
         }
 
-        logger.info(f"Creating order for {size} {symbol} at {price}...")
+        logger.info(f"Creating order for {side}: {size} {symbol} at {price}. {order_type}")
         response = requests.post(url, headers=headers, data=body_json, proxies=self.proxies)
         if response.status_code == 200:
             logger.info(f"Order created successfully: {response.json()}")

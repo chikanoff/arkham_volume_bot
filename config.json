@@ -1,0 +1,5 @@
+{
+    "target_volume": 100000,
+    "max_check_price": 3,
+    "slippage": 0.005
+}

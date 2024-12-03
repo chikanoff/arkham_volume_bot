@@ -1,27 +1,33 @@
-from dotenv import load_dotenv
-import os
+import json
 import asyncio
+from uuid import uuid4
 from src.utils import load_account_info
 from src.ArkhamAPI import ArkhamAPI
 from src.VolumePumpBot import VolumePumpBot
 
-load_dotenv()
+
+def load_config(config_path="config.json"):
+    with open(config_path, "r") as f:
+        return json.load(f)
 
 async def main():
-    # Загружаем информацию об аккаунтах из файла
     accounts = load_account_info('accounts.csv')
+    config = load_config()
+
+    target_volume = config["target_volume"]
+    max_check_price = config["max_check_price"]
+    slippage = config["slippage"]
     tasks = []
 
-    # Определяем тикеры и параметры бота
+    # тикеры
     symbols = {
         "ETH_USDT": {"rounding_step": 0.001},
         "BTC_USDT": {"rounding_step": 0.00001},
         "PEPE_USDT": {"rounding_step": 1},
         "SOL_USDT": {"rounding_step": 0.001},
-        "WIF_USDT": {"rounding_step": 0.01}
+        "WIF_USDT": {"rounding_step": 0.01},
+        "AVAX_USDT": {"rounding_step": 0.01}
     }
-    target_volume = 10000  # Целевой объем
-    percentage_of_balance = 0.3  # Процент от баланса для сделок
 
     for account in accounts:
         proxies = {
@@ -29,14 +35,13 @@ async def main():
             "https": f"http://{account['proxy']}"
         }
 
-        # Создаем экземпляр API и бота
-        api = ArkhamAPI(account['api_key'], account['api_secret'], proxies=proxies)
-        bot = VolumePumpBot(api=api, symbols=symbols, target_volume=target_volume, percentage_of_balance=percentage_of_balance)
+        account_id = str(uuid4())
 
-        # Добавляем задачу для запуска бота
+        api = ArkhamAPI(account['api_key'], account['api_secret'], proxies=proxies)
+        bot = VolumePumpBot(api=api, symbols=symbols, target_volume=target_volume, max_check_price=max_check_price, slippage=slippage)
+
         tasks.append(bot.run())
 
-    # Запускаем все боты параллельно
     await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
