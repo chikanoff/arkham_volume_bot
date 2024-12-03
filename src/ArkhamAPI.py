@@ -77,11 +77,12 @@ class ArkhamAPI:
             logger.error(f"Error fetching balance for {symbol}: {response.status_code} - {response.text}")
             return None
 
-    def create_order(self, price, size, side, symbol, subaccount_id=0, post_only=False, order_type="limitGtc"):
+    def create_order(self, price, size, side, symbol, subaccount_id=0, post_only=False):
         path = "/orders/new"
         url = f"{self.base_url}{path}"
         method = "POST"
         client_order_id = str(uuid.uuid4())
+
         body = {
             "clientOrderId": client_order_id,
             "postOnly": post_only,
@@ -90,7 +91,7 @@ class ArkhamAPI:
             "size": str(size),
             "subaccountId": subaccount_id,
             "symbol": symbol,
-            "type": order_type
+            "type": "market"
         }
 
         body_json = json.dumps(body)
@@ -130,9 +131,15 @@ class ArkhamAPI:
         response = requests.get(url, headers=headers, proxies=self.proxies)
         if response.status_code == 200:
             volume_data = response.json()
-            # Получаем объем из первого элемента массива totalVolume
-            total_volume = float(volume_data['totalVolume'][0]['size']) if 'totalVolume' in volume_data and volume_data['totalVolume'] else 0
+            spot_taker_volume = float(volume_data['spotTakerVolume']) if 'spotTakerVolume' in volume_data and volume_data['spotTakerVolume'] else 0
+            spot_maker_volume = float(volume_data['spotMakerVolume']) if 'spotMakerVolume' in volume_data and volume_data['spotMakerVolume'] else 0
+            total_volume = spot_taker_volume+spot_maker_volume
+            spot_taker_fees = float(volume_data['spotTakerFees']) if 'spotTakerFees' in volume_data and volume_data['spotTakerFees'] else 0
+            spot_maker_fees = float(volume_data['spotMakerFees']) if 'spotMakerFees' in volume_data and volume_data['spotMakerFees'] else 0
+            
+            total_fees = spot_maker_fees + spot_taker_fees
             logger.info(f"Trading volume: {total_volume}")
+            logger.info(f"Spot fees: {total_fees}")
             return total_volume
         else:
             logger.error(f"Error fetching trading volume: {response.status_code} - {response.text}")
