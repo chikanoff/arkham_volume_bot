@@ -35,8 +35,6 @@ async def main():
             "https": f"http://{account['proxy']}"
         }
 
-        account_id = str(uuid4())
-
         api = ArkhamAPI(account['api_key'], account['api_secret'], proxies=proxies)
         bot = VolumePumpBot(api=api, symbols=symbols, target_volume=target_volume, max_check_price=max_check_price, slippage=slippage)
 
