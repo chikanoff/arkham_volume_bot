@@ -100,7 +100,9 @@ class VolumePumpBot:
 
         size = round(size, 10)
 
-        response = self.api.create_order(price=current_price, size=size, side="buy", symbol=symbol, type="limitGtc")
+        order_type = random.choice(["limitGtc", "market"])
+
+        response = self.api.create_order(price=current_price, size=size, side="buy", symbol=symbol, type=order_type)
 
         if response and "orderId" in response:
             order_id = response["orderId"]
@@ -109,14 +111,31 @@ class VolumePumpBot:
         else:
             logger.error(f"Ошибка при открытии позиции для {symbol}.")
 
-    async def close_position(self, order_id, symbol, size):
+    async def close_position_random(self, order_id, symbol, size):
         """Закрытие позиции (продажа)."""
         current_price = self.api.get_market_price(symbol)
         if current_price is None:
             logger.error(f"Не удалось получить цену для {symbol}.")
             return
         
-        response = self.api.create_order(price=current_price, size=size, side="sell", symbol=symbol, type="limitGtc")
+        order_type = random.choice(["limitGtc", "market"])
+        
+        response = self.api.create_order(price=current_price, size=size, side="sell", symbol=symbol, type=order_type)
+        
+        if response:
+            self._update_order(order_id, "closed", closed_at=datetime.now())
+            await self._wait_until_filled(symbol)
+        else:
+            logger.error(f"Ошибка при закрытии позиции для {symbol}.")
+
+    async def close_position_by_market(self, order_id, symbol, size):
+        """Закрытие позиции (продажа)."""
+        current_price = self.api.get_market_price(symbol)
+        if current_price is None:
+            logger.error(f"Не удалось получить цену для {symbol}.")
+            return
+        
+        response = self.api.create_order(price=current_price, size=size, side="sell", symbol=symbol, type="market")
         
         if response:
             self._update_order(order_id, "closed", closed_at=datetime.now())
@@ -143,13 +162,17 @@ class VolumePumpBot:
                 continue
 
             if hold_time >= timedelta(minutes=5):
+                if current_price >= open_price*(1 + self.slippage):
+                    await self.close_position_by_market(order_id, symbol, size)
+                    continue
+
                 if current_price >= open_price:
-                    await self.close_position(order_id, symbol, size)
+                    await self.close_position_random(order_id, symbol, size)
                     continue
 
                 if check_count >= self.max_check_price:
                     logger.warning(f"Принудительное закрытие {symbol}, цена: {current_price}")
-                    await self.close_position(order_id, symbol, size)
+                    await self.close_position_by_market(order_id, symbol, size)
                 else:
                     conn = sqlite3.connect(self.db_path)
                     cursor = conn.cursor()
@@ -168,7 +191,7 @@ class VolumePumpBot:
             try:
                 if self.api.get_open_orders():
                     self._wait_until_filled()
-                    
+
                 current_volume = self.api.get_trading_volume()
                 logger.info(f"Текущий объем сделок: {current_volume}")
 

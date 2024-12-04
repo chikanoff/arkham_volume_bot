@@ -110,10 +110,8 @@ class ArkhamAPI:
         url = f"{self.base_url}{path}"
         method = "POST"
         client_order_id = str(uuid.uuid4())
-
-        order_type = random.choice(["limitGtc", "market"])
         
-        if order_type == "market":
+        if type == "market":
             price = 0
 
         body = {
@@ -124,7 +122,7 @@ class ArkhamAPI:
             "size": str(size),
             "subaccountId": subaccount_id,
             "symbol": symbol,
-            "type": order_type
+            "type": type
         }
 
         body_json = json.dumps(body)
@@ -138,7 +136,7 @@ class ArkhamAPI:
             "Arkham-Signature": signature
         }
 
-        logger.info(f"Creating order for {side}: {size} {symbol} at {price}. {order_type}")
+        logger.info(f"Creating order for {side}: {size} {symbol} at {price}. {type}")
         response = requests.post(url, headers=headers, data=body_json, proxies=self.proxies)
         if response.status_code == 200:
             logger.info(f"Order created successfully: {response.json()}")
