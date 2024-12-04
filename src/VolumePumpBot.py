@@ -67,14 +67,18 @@ class VolumePumpBot:
     async def _wait_until_filled(self, symbol):
         is_filled = False
         while not is_filled:
-            open_orders = self.api.get_open_orders()
-            if not open_orders:
-                is_filled = True
-                logger.info(f"Ордер заполнился для {symbol}")
-                break
-            else:
-                logger.info(f"Ожидание заполнения ордера для {symbol} 5 секунд....")
-                await asyncio.sleep(10)
+            try:
+                open_orders = self.api.get_open_orders()
+                if not open_orders:
+                    is_filled = True
+                    logger.info(f"Ордер заполнился для {symbol}")
+                    break
+                else:
+                    logger.info(f"Ожидание заполнения ордера для {symbol} 10 секунд....")
+                    await asyncio.sleep(10)
+            except Exception as e:
+                logger.error(f"Произошла ошибка сети: {e}")
+                await asyncio.sleep(12)
 
     async def open_position(self, symbol):
         """Открытие позиции на весь доступный баланс."""
@@ -99,9 +103,9 @@ class VolumePumpBot:
         response = self.api.create_order(price=current_price, size=size, side="buy", symbol=symbol, type="limitGtc")
 
         if response and "orderId" in response:
-            await self._wait_until_filled(symbol)
             order_id = response["orderId"]
             self._save_order(order_id, symbol, "buy", size, current_price)
+            await self._wait_until_filled(symbol)
         else:
             logger.error(f"Ошибка при открытии позиции для {symbol}.")
 
@@ -115,8 +119,8 @@ class VolumePumpBot:
         response = self.api.create_order(price=current_price, size=size, side="sell", symbol=symbol, type="limitGtc")
         
         if response:
-            await self._wait_until_filled(symbol)
             self._update_order(order_id, "closed", closed_at=datetime.now())
+            await self._wait_until_filled(symbol)
         else:
             logger.error(f"Ошибка при закрытии позиции для {symbol}.")
 
@@ -162,6 +166,9 @@ class VolumePumpBot:
         """Запуск бота с учетом рандомной задержки."""
         while True:
             try:
+                if self.api.get_open_orders():
+                    self._wait_until_filled()
+                    
                 current_volume = self.api.get_trading_volume()
                 logger.info(f"Текущий объем сделок: {current_volume}")
 

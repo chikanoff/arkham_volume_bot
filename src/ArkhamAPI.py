@@ -119,7 +119,7 @@ class ArkhamAPI:
         body = {
             "clientOrderId": client_order_id,
             "postOnly": post_only,
-            "price": str(price),
+            "price": f"{price:.8f}",
             "side": side,
             "size": str(size),
             "subaccountId": subaccount_id,
