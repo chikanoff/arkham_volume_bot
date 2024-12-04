@@ -100,7 +100,8 @@ class VolumePumpBot:
 
         size = round(size, 10)
 
-        order_type = random.choice(["limitGtc", "market"])
+        # order_type = random.choice(["limitGtc", "market"])
+        order_type = "market"
 
         response = self.api.create_order(price=current_price, size=size, side="buy", symbol=symbol, type=order_type)
 

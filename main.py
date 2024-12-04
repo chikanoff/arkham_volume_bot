@@ -25,7 +25,7 @@ async def main():
         "PEPE_USDT": {"rounding_step": 1},
         "SOL_USDT": {"rounding_step": 0.001},
         "WIF_USDT": {"rounding_step": 0.01},
-        "AVAX_USDT": {"rounding_step": 0.01}
+        # "AVAX_USDT": {"rounding_step": 0.01}
     }
 
     for account in accounts:
