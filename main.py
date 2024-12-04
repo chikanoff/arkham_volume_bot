@@ -1,6 +1,5 @@
 import json
 import asyncio
-from uuid import uuid4
 from src.utils import load_account_info
 from src.ArkhamAPI import ArkhamAPI
 from src.VolumePumpBot import VolumePumpBot
