@@ -1,3 +1,4 @@
 loguru
 asyncio
 requests
+chardet
