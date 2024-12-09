@@ -22,17 +22,19 @@ async def main():
     symbols = {
         "ETH_USDT": {"rounding_step": 0.001},
         "BTC_USDT": {"rounding_step": 0.00001},
-        "PEPE_USDT": {"rounding_step": 1},
+        # "PEPE_USDT": {"rounding_step": 1},
         "SOL_USDT": {"rounding_step": 0.001},
-        "WIF_USDT": {"rounding_step": 0.01},
+        # "WIF_USDT": {"rounding_step": 0.01},
         # "AVAX_USDT": {"rounding_step": 0.01}
     }
 
     for account in accounts:
-        proxies = {
-            "http": f"http://{account['proxy']}",
-            "https": f"http://{account['proxy']}"
-        }
+        proxies = None
+        if account["proxy"]:
+            proxies = {
+                "http": f"http://{account['proxy']}",
+                "https": f"http://{account['proxy']}"
+            }
 
         api = ArkhamAPI(account['api_key'], account['api_secret'], proxies=proxies)
         bot = VolumePumpBot(api=api, symbols=symbols, target_volume=target_volume, max_check_price=max_check_price, slippage=slippage)

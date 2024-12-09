@@ -22,6 +22,7 @@ class VolumePumpBot:
         cursor = conn.cursor()
         cursor.execute('''CREATE TABLE IF NOT EXISTS orders (
                             order_id TEXT PRIMARY KEY,
+                            account_id TEXT,
                             symbol TEXT,
                             side TEXT,
                             size REAL,
@@ -33,16 +34,15 @@ class VolumePumpBot:
         conn.commit()
         conn.close()
 
-    def _save_order(self, order_id, symbol, side, size, open_price):
+    def _save_order(self, order_id, account_id, symbol, side, size, open_price):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute('''INSERT INTO orders (order_id, symbol, side, size, open_price, status, created_at) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?)''', 
-                        (order_id, symbol, side, size, open_price, "open", datetime.now()))
+        cursor.execute('''INSERT INTO orders (order_id, account_id, symbol, side, size, open_price, status, created_at) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)''', 
+                        (order_id, account_id, symbol, side, size, open_price, "open", datetime.now()))
         conn.commit()
         conn.close()
-        logger.info(f"Сохранен ордер {order_id}: {side} {size} {symbol} по цене {open_price}")
-
+        logger.info(f"Сохранен ордер {order_id} для {account_id}: {side} {size} {symbol} по цене {open_price}")
 
     def _update_order(self, order_id, status, closed_at=None):
         """Обновление статуса ордера."""
@@ -56,10 +56,10 @@ class VolumePumpBot:
         conn.close()
         logger.info(f"Обновлен ордер {order_id}: статус {status}")
 
-    def _get_open_orders(self):
+    def _get_open_orders(self, account_id):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT order_id, symbol, side, size, open_price, status, created_at, closed_at, check_count FROM orders WHERE status = 'open'")
+        cursor.execute("SELECT * FROM orders WHERE account_id = ? AND status = 'open'", (account_id,))
         open_orders = cursor.fetchall()
         conn.close()
         return open_orders
@@ -101,13 +101,15 @@ class VolumePumpBot:
         size = round(size, 10)
 
         # order_type = random.choice(["limitGtc", "market"])
-        order_type = "market"
+        order_type = "limitGtc"
+        if symbol == "ETH_USDT":
+            order_type = "market"
 
         response = self.api.create_order(price=current_price, size=size, side="buy", symbol=symbol, type=order_type)
 
         if response and "orderId" in response:
             order_id = response["orderId"]
-            self._save_order(order_id, symbol, "buy", size, current_price)
+            self._save_order(order_id, self.api.api_key, symbol, "buy", size, current_price)
             await self._wait_until_filled(symbol)
         else:
             logger.error(f"Ошибка при открытии позиции для {symbol}.")
@@ -145,10 +147,10 @@ class VolumePumpBot:
             logger.error(f"Ошибка при закрытии позиции для {symbol}.")
 
     async def manage_positions(self):
-        open_orders = self._get_open_orders()
+        open_orders = self._get_open_orders(account_id=self.api.api_key)
 
         for order in open_orders:
-            order_id, symbol, side, size, open_price, status, created_at, closed_at, check_count = order
+            order_id, account_id, symbol, side, size, open_price, status, created_at, closed_at, check_count = order
 
             if side != "buy":
                 continue
@@ -159,7 +161,7 @@ class VolumePumpBot:
             await asyncio.sleep(2)
 
             if not current_price:
-                logger.error(f"Не удалось получить текущую цену для {symbol}.")
+                logger.error(f"{account_id}: Не удалось получить текущую цену для {symbol}.")
                 continue
 
             if hold_time >= timedelta(minutes=5):
@@ -172,7 +174,7 @@ class VolumePumpBot:
                     continue
 
                 if check_count >= self.max_check_price:
-                    logger.warning(f"Принудительное закрытие {symbol}, цена: {current_price}")
+                    logger.warning(f"{account_id}: Принудительное закрытие {symbol}, цена: {current_price}")
                     await self.close_position_by_market(order_id, symbol, size)
                 else:
                     conn = sqlite3.connect(self.db_path)
@@ -184,7 +186,7 @@ class VolumePumpBot:
                     conn.commit()
                     conn.close()
 
-                    logger.info(f"Цена для {symbol} ниже точки входа. Проверка #{check_count + 1}.")
+                    logger.info(f"{account_id}: Цена для {symbol} ниже точки входа. Проверка #{check_count + 1}.")
 
     async def run(self):
         """Запуск бота с учетом рандомной задержки."""
@@ -200,7 +202,7 @@ class VolumePumpBot:
                     logger.info(f"Целевой объем {self.target_volume} достигнут!")
                     break
 
-                open_orders = self._get_open_orders()
+                open_orders = self._get_open_orders(account_id=self.api.api_key)
 
                 if not open_orders:
                     symbol = random.choice(list(self.symbols.keys()))
