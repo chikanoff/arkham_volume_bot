@@ -7,13 +7,14 @@ from src.ArkhamAPI import ArkhamAPI
 import asyncio
 
 class VolumePumpBot:
-    def __init__(self, api: ArkhamAPI, symbols: dict, target_volume: float, max_check_price: int, slippage: float, db_path="orders.db"):
+    def __init__(self, api: ArkhamAPI, symbols: dict, target_volume: float, max_check_price: int, slippage: float, is_perpetual, db_path="orders.db"):
         self.api = api
         self.symbols = symbols
         self.target_volume = target_volume
         self.max_check_price = max_check_price
         self.slippage = slippage
         self.db_path = db_path
+        self.is_perpetual = is_perpetual
         self._setup_db()
         logger.add("bot.log", rotation="1 day", level="INFO")
 
@@ -92,7 +93,11 @@ class VolumePumpBot:
             logger.error(f"Не удалось получить цену для {symbol}.")
             return
 
-        size = balance*0.99 / current_price
+        if(self.is_perpetual):
+            size = balance*8 / current_price
+        else:
+            size = balance*0.98 / current_price
+
         if self.symbols[symbol]["rounding_step"] == 1:
             size = int(size)
         else:

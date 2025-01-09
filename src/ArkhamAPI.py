@@ -176,3 +176,23 @@ class ArkhamAPI:
             logger.error(f"Error fetching trading volume: {response.status_code} - {response.text}")
             return 0
 
+    def get_tickers(self):
+        path = "/public/tickers"
+        url = f"{self.base_url}{path}"
+        method = "GET"
+        expires = str(int(time.time() * 1000000) + 300000000)
+        signature = self.generate_signature(method, path, "", expires)
+
+        headers = {
+            "Arkham-Api-Key": self.api_key,
+            "Arkham-Expires": expires,
+            "Arkham-Signature": signature
+        }
+
+        logger.info("Fetching tickers...")
+        response = requests.get(url, headers=headers, proxies=self.proxies)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"Error fetching tickers: {response.status_code} - {response.text}")
+            return 0
