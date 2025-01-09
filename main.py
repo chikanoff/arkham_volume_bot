@@ -17,6 +17,7 @@ async def main():
     max_check_price = config["max_check_price"]
     slippage = config["slippage"]
     is_perpetual = config["is_perpetual"]
+    leverage = config["leverage"]
     tasks = []
 
     # тикеры
@@ -47,7 +48,7 @@ async def main():
             }
 
         api = ArkhamAPI(account['api_key'], account['api_secret'], proxies=proxies)
-        bot = VolumePumpBot(api=api, symbols=symbols_perp, target_volume=target_volume, max_check_price=max_check_price, slippage=slippage, is_perpetual=is_perpetual)
+        bot = VolumePumpBot(api=api, symbols=symbols_perp, target_volume=target_volume, max_check_price=max_check_price, slippage=slippage, is_perpetual=is_perpetual, leverage=leverage)
         tasks.append(bot.run())
 
     await asyncio.gather(*tasks)

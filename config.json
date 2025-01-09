@@ -2,5 +2,6 @@
     "target_volume": 140000,
     "max_check_price": 3,
     "slippage": 0.005,
-    "is_perpetual": 1
+    "is_perpetual": 1,
+    "leverage": 3
 }
