@@ -7,15 +7,16 @@ from src.ArkhamAPI import ArkhamAPI
 import asyncio
 
 class VolumePumpBot:
-    def __init__(self, api: ArkhamAPI, symbols: dict, target_volume: float, max_check_price: int, slippage: float, is_perpetual, leverage, db_path="orders.db"):
+    def __init__(self, api: ArkhamAPI, symbols: dict, spot_target_volume: float, perp_target_volume: float, max_check_price: int, slippage: float, is_perpetual, leverage, db_path="orders.db"):
         self.api = api
         self.symbols = symbols
-        self.target_volume = target_volume
+        self.spot_target_volume = spot_target_volume
         self.max_check_price = max_check_price
         self.slippage = slippage
         self.db_path = db_path
         self.is_perpetual = is_perpetual
         self.leverage = leverage
+        self.perp_target_volume = perp_target_volume
         self._setup_db()
         logger.add("bot.log", rotation="1 day", level="INFO")
 
@@ -201,11 +202,15 @@ class VolumePumpBot:
                 if self.api.get_open_orders():
                     self._wait_until_filled()
 
-                current_volume = self.api.get_trading_volume()
-                logger.info(f"Текущий объем сделок: {current_volume}")
+                spot_volume, perp_volume = self.api.get_trading_volume()
+                # logger.info(f"Текущий объем сделок: {spot_volume}")
 
-                if current_volume >= self.target_volume:
-                    logger.info(f"Целевой объем {self.target_volume} достигнут!")
+                if spot_volume >= self.spot_target_volume and not self.is_perpetual:
+                    logger.info(f"Целевой объем по споту {self.spot_target_volume} достигнут!")
+                    break
+
+                if perp_volume >= self.perp_target_volume and self.is_perpetual:
+                    logger.info(f"Целевой объем по фьючам {self.spot_target_volume} достигнут!")
                     break
 
                 open_orders = self._get_open_orders(account_id=self.api.api_key)

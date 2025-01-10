@@ -1,7 +1,8 @@
 {
-    "target_volume": 140000,
+    "spot_target_volume": 140000,
     "max_check_price": 3,
     "slippage": 0.005,
     "is_perpetual": 1,
-    "leverage": 3
+    "leverage": 8,
+    "perp_target_volume": 1000000
 }

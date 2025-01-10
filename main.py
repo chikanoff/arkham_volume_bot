@@ -13,11 +13,12 @@ async def main():
     accounts = load_account_info('accounts.csv')
     config = load_config()
 
-    target_volume = config["target_volume"]
+    spot_target_volume = config["spot_target_volume"]
     max_check_price = config["max_check_price"]
     slippage = config["slippage"]
     is_perpetual = config["is_perpetual"]
     leverage = config["leverage"]
+    perp_target_volume = config["perp_target_volume"]
     tasks = []
 
     # тикеры
@@ -33,10 +34,10 @@ async def main():
     symbols_perp = {
         "ETH_USDT_PERP": {"rounding_step": 0.001},
         "BTC_USDT_PERP": {"rounding_step": 0.00001},
-        # "PEPEPERP": {"rounding_step": 1},
-        # "SOLPERP": {"rounding_step": 0.001},
-        # "WIFPERP": {"rounding_step": 0.01},
-        # "AVAXPERP": {"rounding_step": 0.01}
+        # "PEPE_USDT_PERP": {"rounding_step": 1},
+        # "SOL_USDT_PERP": {"rounding_step": 0.001},
+        # "WIF_USDT_PERP": {"rounding_step": 0.01},
+        # "AVAX_USDTPERP": {"rounding_step": 0.01}
     }
 
     for account in accounts:
@@ -48,7 +49,7 @@ async def main():
             }
 
         api = ArkhamAPI(account['api_key'], account['api_secret'], proxies=proxies)
-        bot = VolumePumpBot(api=api, symbols=symbols_perp, target_volume=target_volume, max_check_price=max_check_price, slippage=slippage, is_perpetual=is_perpetual, leverage=leverage)
+        bot = VolumePumpBot(api=api, symbols=symbols_perp, spot_target_volume=spot_target_volume, perp_target_volume=perp_target_volume, max_check_price=max_check_price, slippage=slippage, is_perpetual=is_perpetual, leverage=leverage)
         tasks.append(bot.run())
 
     await asyncio.gather(*tasks)

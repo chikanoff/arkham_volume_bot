@@ -164,14 +164,26 @@ class ArkhamAPI:
             volume_data = response.json()
             spot_taker_volume = float(volume_data['spotTakerVolume']) if 'spotTakerVolume' in volume_data and volume_data['spotTakerVolume'] else 0
             spot_maker_volume = float(volume_data['spotMakerVolume']) if 'spotMakerVolume' in volume_data and volume_data['spotMakerVolume'] else 0
-            total_volume = spot_taker_volume+spot_maker_volume
+            total_spot_volume = spot_taker_volume+spot_maker_volume
+
+            perp_taker_volume = float(volume_data['perpTakerVolume']) if 'perpTakerVolume' in volume_data and volume_data['perpTakerVolume'] else 0
+            spot_maker_volume = float(volume_data['perpMakerVolume']) if 'perpMakerVolume' in volume_data and volume_data['perpMakerVolume'] else 0
+            total_perp_volume = spot_taker_volume+spot_maker_volume
+
             spot_taker_fees = float(volume_data['spotTakerFees']) if 'spotTakerFees' in volume_data and volume_data['spotTakerFees'] else 0
             spot_maker_fees = float(volume_data['spotMakerFees']) if 'spotMakerFees' in volume_data and volume_data['spotMakerFees'] else 0
-            
-            total_fees = spot_maker_fees + spot_taker_fees
-            logger.info(f"Trading volume: {total_volume}")
-            logger.info(f"Spot fees: {total_fees}")
-            return total_volume
+            total_spot_fees = spot_maker_fees + spot_taker_fees
+
+            spot_taker_fees = float(volume_data['perpTakerFees']) if 'perpTakerFees' in volume_data and volume_data['perpTakerFees'] else 0
+            spot_maker_fees = float(volume_data['perpMakerFees']) if 'spotMakerFees' in volume_data and volume_data['perpMakerFees'] else 0
+            total_perp_fees = spot_maker_fees + spot_taker_fees
+
+            logger.info(f"Spot volume: {total_spot_volume}")
+            logger.info(f"Spot fees: {total_spot_fees}")
+
+            logger.info(f"PERP volume: {total_perp_volume}")
+            logger.info(f"PERP fees: {total_perp_fees}")
+            return total_spot_volume, total_perp_volume
         else:
             logger.error(f"Error fetching trading volume: {response.status_code} - {response.text}")
             return 0

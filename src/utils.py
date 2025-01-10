@@ -25,11 +25,13 @@ def load_account_info(file_path='accounts.csv'):
             proxy = row.get('proxy')
             is_perpetual = row.get('is_perpetual')
             leverage = row.get('leverage')
+            perp_target_volume = row.get('perp_target_volume')
             accounts.append({
                 'api_key': api_key,
                 'api_secret': api_secret,
                 'proxy': proxy,
                 'is_perpetual': is_perpetual,
-                'leverage': leverage
+                'leverage': leverage,
+                'perp_target_volume': perp_target_volume
             })
     return accounts
