@@ -145,6 +145,36 @@ class ArkhamAPI:
             logger.error(f"Error creating order: {response.status_code} - {response.text}")
             return None
         
+    def cancel_orders(self):
+        path = "/orders/cancel/all"
+        url = f"{self.base_url}{path}"
+        method = "POST"
+        body = {
+            "subaccountId": 0,
+            "timeToCancel": 0
+        }
+
+        body_json = json.dumps(body)
+        expires = str(int(time.time() * 1000000) + 300000000)
+        signature = self.generate_signature(method, path, body_json, expires)
+
+        headers = {
+            "Content-Type": "application/json",
+            "Arkham-Api-Key": self.api_key,
+            "Arkham-Expires": expires,
+            "Arkham-Signature": signature
+        }
+
+        logger.info(f"Canceling all open orders..")
+        response = requests.post(url, headers=headers, data=body_json, proxies=self.proxies)
+
+        if response.status_code == 200:
+            logger.info(f"Orders cancelled successfully: {response.json()}")
+            return response.json()
+        else:
+            logger.error(f"Error cancelling orders: {response.status_code} - {response.text}")
+            return None
+        
     def get_trading_volume(self):
         path = "/affiliate-dashboard/trading-volume-stats"
         url = f"{self.base_url}{path}"
@@ -167,23 +197,18 @@ class ArkhamAPI:
             total_spot_volume = spot_taker_volume+spot_maker_volume
 
             perp_taker_volume = float(volume_data['perpTakerVolume']) if 'perpTakerVolume' in volume_data and volume_data['perpTakerVolume'] else 0
-            spot_maker_volume = float(volume_data['perpMakerVolume']) if 'perpMakerVolume' in volume_data and volume_data['perpMakerVolume'] else 0
-            total_perp_volume = spot_taker_volume+spot_maker_volume
+            perp_maker_volume = float(volume_data['perpMakerVolume']) if 'perpMakerVolume' in volume_data and volume_data['perpMakerVolume'] else 0
+            total_perp_volume = perp_taker_volume+perp_maker_volume
 
             spot_taker_fees = float(volume_data['spotTakerFees']) if 'spotTakerFees' in volume_data and volume_data['spotTakerFees'] else 0
             spot_maker_fees = float(volume_data['spotMakerFees']) if 'spotMakerFees' in volume_data and volume_data['spotMakerFees'] else 0
             total_spot_fees = spot_maker_fees + spot_taker_fees
 
-            spot_taker_fees = float(volume_data['perpTakerFees']) if 'perpTakerFees' in volume_data and volume_data['perpTakerFees'] else 0
-            spot_maker_fees = float(volume_data['perpMakerFees']) if 'spotMakerFees' in volume_data and volume_data['perpMakerFees'] else 0
-            total_perp_fees = spot_maker_fees + spot_taker_fees
+            perp_taker_fees = float(volume_data['perpTakerFees']) if 'perpTakerFees' in volume_data and volume_data['perpTakerFees'] else 0
+            perp_maker_fees = float(volume_data['perpMakerFees']) if 'spotMakerFees' in volume_data and volume_data['perpMakerFees'] else 0
+            total_perp_fees = perp_taker_fees + perp_maker_fees
 
-            logger.info(f"Spot volume: {total_spot_volume}")
-            logger.info(f"Spot fees: {total_spot_fees}")
-
-            logger.info(f"PERP volume: {total_perp_volume}")
-            logger.info(f"PERP fees: {total_perp_fees}")
-            return total_spot_volume, total_perp_volume
+            return total_spot_volume, total_perp_volume, total_spot_fees, total_perp_fees
         else:
             logger.error(f"Error fetching trading volume: {response.status_code} - {response.text}")
             return 0

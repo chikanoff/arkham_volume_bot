@@ -7,7 +7,19 @@ from src.ArkhamAPI import ArkhamAPI
 import asyncio
 
 class VolumePumpBot:
-    def __init__(self, api: ArkhamAPI, symbols: dict, spot_target_volume: float, perp_target_volume: float, max_check_price: int, slippage: float, is_perpetual, leverage, db_path="orders.db"):
+    def __init__(
+            self, 
+            api: ArkhamAPI, 
+            symbols: dict, 
+            spot_target_volume: float, 
+            perp_target_volume: float, 
+            max_check_price: int, 
+            slippage: float, 
+            is_perpetual, 
+            leverage,
+            hold_time: int,
+            db_path="orders.db"
+    ):
         self.api = api
         self.symbols = symbols
         self.spot_target_volume = spot_target_volume
@@ -16,6 +28,7 @@ class VolumePumpBot:
         self.db_path = db_path
         self.is_perpetual = is_perpetual
         self.leverage = leverage
+        self.hold_time = hold_time
         self.perp_target_volume = perp_target_volume
         self._setup_db()
         logger.add("bot.log", rotation="1 day", level="INFO")
@@ -67,24 +80,54 @@ class VolumePumpBot:
         conn.close()
         return open_orders
 
-    async def _wait_until_filled(self, symbol):
-        is_filled = False
-        while not is_filled:
+    def _calculate_limit_price(self, current_price, side, rounding_step=0.01):
+        """Рассчитать цену лимитного ордера с учетом шага цены."""
+        adjustment = current_price * 0.0001
+        if side == "buy":
+            limit_price = current_price - adjustment
+        elif side == "sell":
+            limit_price = current_price + adjustment
+        else:
+            limit_price = current_price
+
+        # Округление до кратного шага цены
+        return round(limit_price - (limit_price % rounding_step), 2)
+
+
+    async def _wait_until_filled(self, order_id=None, symbol=None, size=None,  side=None, timeout=20):
+        start_time = datetime.now()
+        while True:
             try:
                 open_orders = self.api.get_open_orders()
                 if not open_orders:
-                    is_filled = True
-                    logger.info(f"Ордер заполнился для {symbol}")
+                    logger.info(f"Нет открытых ордеров")
                     break
-                else:
-                    logger.info(f"Ожидание заполнения ордера для {symbol} 10 секунд....")
-                    await asyncio.sleep(10)
+
+                elapsed_time = (datetime.now() - start_time).total_seconds()
+                if elapsed_time >= timeout:
+                    logger.warning(f"Ордер {order_id} для {symbol} не заполнился за {timeout} секунд. Переустановка ордера.")
+                    self.api.cancel_orders()
+                    
+                    current_price = self.api.get_market_price(symbol)
+                    new_price = self._calculate_limit_price(current_price, side, self.symbols[symbol]["rounding_step"])
+                    new_order = self.api.create_order(price=new_price, size=size, side=side, symbol=symbol, type="limitGtc")
+
+                    if new_order and "orderId" in new_order:
+                        order_id = new_order["orderId"]
+                        start_time = datetime.now()
+                    else:
+                        logger.error(f"Не удалось создать новый ордер для {symbol}.")
+                        break
+                logger.info("Ожидание заполнения ордера...")
+                await asyncio.sleep(5)
+
             except Exception as e:
-                logger.error(f"Произошла ошибка сети: {e}")
-                await asyncio.sleep(12)
+                logger.error(f"Ошибка при ожидании заполнения ордера для {symbol}: {e}")
+                await asyncio.sleep(10)
+
 
     async def open_position(self, symbol):
-        """Открытие позиции на весь доступный баланс."""
+        """Открытие позиции на весь доступный баланс с лимитным ордером."""
         balance = self.api.get_balance_for_symbol("USDT")
         if balance is None or balance <= 0:
             logger.error("Недостаточно средств на балансе USDT.")
@@ -95,48 +138,36 @@ class VolumePumpBot:
             logger.error(f"Не удалось получить цену для {symbol}.")
             return
 
-        if(self.is_perpetual):
-            size = balance * self.leverage / current_price
-        else:
-            size = balance*0.98 / current_price
+        size = (balance * self.leverage / current_price) if self.is_perpetual else (balance * 0.98 / current_price)
+        size = round(size - (size % self.symbols[symbol]["rounding_step"]), 10)
 
-        if self.symbols[symbol]["rounding_step"] == 1:
-            size = int(size)
-        else:
-            size = size - (size % self.symbols[symbol]["rounding_step"])
-
-        size = round(size, 10)
-
-        # order_type = random.choice(["limitGtc", "market"])
-        order_type = "limitGtc"
-        if symbol == "ETH_USDT":
-            order_type = "market"
-
-        response = self.api.create_order(price=current_price, size=size, side="buy", symbol=symbol, type=order_type)
+        limit_price = self._calculate_limit_price(current_price, side="buy", rounding_step=self.symbols[symbol]["rounding_step"])
+        response = self.api.create_order(price=limit_price, size=size, side="buy", symbol=symbol, type="limitGtc")
 
         if response and "orderId" in response:
             order_id = response["orderId"]
             self._save_order(order_id, self.api.api_key, symbol, "buy", size, current_price)
-            await self._wait_until_filled(symbol)
+            await self._wait_until_filled(order_id, symbol, size, side="buy")
         else:
             logger.error(f"Ошибка при открытии позиции для {symbol}.")
 
-    async def close_position_random(self, order_id, symbol, size):
-        """Закрытие позиции (продажа)."""
+
+    async def close_position_limit(self, order_id, symbol, size):
+        """Закрытие позиции лимитным ордером с небольшим увеличением цены."""
         current_price = self.api.get_market_price(symbol)
         if current_price is None:
             logger.error(f"Не удалось получить цену для {symbol}.")
             return
-        
-        order_type = random.choice(["limitGtc", "market"])
-        
-        response = self.api.create_order(price=current_price, size=size, side="sell", symbol=symbol, type=order_type)
-        
+
+        limit_price = self._calculate_limit_price(current_price, side="sell", rounding_step=self.symbols[symbol]["rounding_step"])
+        response = self.api.create_order(price=limit_price, size=size, side="sell", symbol=symbol, type="limitGtc")
+
         if response:
             self._update_order(order_id, "closed", closed_at=datetime.now())
-            await self._wait_until_filled(symbol)
+            await self._wait_until_filled(order_id, symbol, size, side="sell")
         else:
             logger.error(f"Ошибка при закрытии позиции для {symbol}.")
+
 
     async def close_position_by_market(self, order_id, symbol, size):
         """Закрытие позиции (продажа)."""
@@ -149,7 +180,7 @@ class VolumePumpBot:
         
         if response:
             self._update_order(order_id, "closed", closed_at=datetime.now())
-            await self._wait_until_filled(symbol)
+            await self._wait_until_filled(order_id, symbol, size, side="sell")
         else:
             logger.error(f"Ошибка при закрытии позиции для {symbol}.")
 
@@ -171,18 +202,19 @@ class VolumePumpBot:
                 logger.error(f"{account_id}: Не удалось получить текущую цену для {symbol}.")
                 continue
 
-            if hold_time >= timedelta(minutes=5):
-                if current_price >= open_price*(1 + self.slippage):
-                    await self.close_position_by_market(order_id, symbol, size)
-                    continue
+            if current_price >= open_price*(1 + self.slippage):
+                logger.info(f"Текущая цена больше цены открытия на {self.slippage} - закрываем позицию")
+                await self.close_position_limit(order_id, symbol, size)
+                continue
 
+            if hold_time >= timedelta(minutes=self.hold_time):
                 if current_price >= open_price:
-                    await self.close_position_random(order_id, symbol, size)
+                    await self.close_position_limit(order_id, symbol, size)
                     continue
 
                 if check_count >= self.max_check_price:
                     logger.warning(f"{account_id}: Принудительное закрытие {symbol}, цена: {current_price}")
-                    await self.close_position_by_market(order_id, symbol, size)
+                    await self.close_position_limit(order_id, symbol, size)
                 else:
                     conn = sqlite3.connect(self.db_path)
                     cursor = conn.cursor()
@@ -202,8 +234,8 @@ class VolumePumpBot:
                 if self.api.get_open_orders():
                     self._wait_until_filled()
 
-                spot_volume, perp_volume = self.api.get_trading_volume()
-                # logger.info(f"Текущий объем сделок: {spot_volume}")
+                spot_volume, perp_volume, spot_fees, perp_fees = self.api.get_trading_volume()
+                
 
                 if spot_volume >= self.spot_target_volume and not self.is_perpetual:
                     logger.info(f"Целевой объем по споту {self.spot_target_volume} достигнут!")
@@ -216,13 +248,18 @@ class VolumePumpBot:
                 open_orders = self._get_open_orders(account_id=self.api.api_key)
 
                 if not open_orders:
+                    logger.info(f"Spot volume: {spot_volume}")
+                    logger.info(f"Spot fees: {spot_fees}")
+
+                    logger.info(f"PERP volume: {perp_volume}")
+                    logger.info(f"PERP fees: {perp_fees}")
                     symbol = random.choice(list(self.symbols.keys()))
                     await self.open_position(symbol)
                     await asyncio.sleep(2)
                 else:
                     await self.manage_positions()
 
-                await asyncio.sleep(random.randint(30, 60))
+                await asyncio.sleep(random.randint(40, 50))
 
             except requests.exceptions.RequestException as e:
                 logger.error(f"Произошла ошибка сети: {e}")

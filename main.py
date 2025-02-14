@@ -19,6 +19,7 @@ async def main():
     is_perpetual = config["is_perpetual"]
     leverage = config["leverage"]
     perp_target_volume = config["perp_target_volume"]
+    hold_time = config["hold_time"]
     tasks = []
 
     # тикеры
@@ -33,7 +34,7 @@ async def main():
 
     symbols_perp = {
         "ETH_USDT_PERP": {"rounding_step": 0.001},
-        "BTC_USDT_PERP": {"rounding_step": 0.00001},
+        # "BTC_USDT_PERP": {"rounding_step": 0.00001},
         # "PEPE_USDT_PERP": {"rounding_step": 1},
         # "SOL_USDT_PERP": {"rounding_step": 0.001},
         # "WIF_USDT_PERP": {"rounding_step": 0.01},
@@ -49,7 +50,17 @@ async def main():
             }
 
         api = ArkhamAPI(account['api_key'], account['api_secret'], proxies=proxies)
-        bot = VolumePumpBot(api=api, symbols=symbols_perp, spot_target_volume=spot_target_volume, perp_target_volume=perp_target_volume, max_check_price=max_check_price, slippage=slippage, is_perpetual=is_perpetual, leverage=leverage)
+        bot = VolumePumpBot(
+            api=api, 
+            symbols=symbols_perp, 
+            spot_target_volume=spot_target_volume, 
+            perp_target_volume=perp_target_volume, 
+            max_check_price=max_check_price, 
+            slippage=slippage, 
+            is_perpetual=is_perpetual, 
+            leverage=leverage,
+            hold_time=hold_time
+        )
         tasks.append(bot.run())
 
     await asyncio.gather(*tasks)

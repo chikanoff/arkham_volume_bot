@@ -1,7 +1,8 @@
 {
-    "spot_target_volume": 140000,
+    "hold_time": 5,
+    "spot_target_volume": 240000,
     "max_check_price": 3,
-    "slippage": 0.005,
+    "slippage": 0.003,
     "is_perpetual": 1,
     "leverage": 8,
     "perp_target_volume": 1000000
