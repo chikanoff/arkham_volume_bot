@@ -49,10 +49,15 @@ async def main():
                 "https": f"http://{account['proxy']}"
             }
 
+        trading_symbols = symbols
+        
+        if is_perpetual:
+            trading_symbols = symbols_perp
+
         api = ArkhamAPI(account['api_key'], account['api_secret'], proxies=proxies)
         bot = VolumePumpBot(
             api=api, 
-            symbols=symbols_perp, 
+            symbols=trading_symbols, 
             spot_target_volume=spot_target_volume, 
             perp_target_volume=perp_target_volume, 
             max_check_price=max_check_price, 
