@@ -150,7 +150,7 @@ class VolumePumpBot:
 
         if response and "orderId" in response:
             order_id = response["orderId"]
-            self._save_order(order_id, self.api.api_key, symbol, "buy", size, current_price)
+            self._save_order(order_id, self.api.api_key, symbol, "buy", size, limit_price)
             await self._wait_until_filled(order_id, symbol, size, side="buy")
         else:
             logger.error(f"Ошибка при открытии позиции для {symbol}.")
