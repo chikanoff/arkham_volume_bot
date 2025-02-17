@@ -18,6 +18,8 @@ class VolumePumpBot:
             is_perpetual, 
             leverage,
             hold_time: int,
+            limit_order_diff: float,
+            limit_hold_time: int,
             db_path="orders.db"
     ):
         self.api = api
@@ -30,6 +32,8 @@ class VolumePumpBot:
         self.leverage = leverage
         self.hold_time = hold_time
         self.perp_target_volume = perp_target_volume
+        self.limit_order_diff= limit_order_diff
+        self.limit_hold_time = limit_hold_time
         self._setup_db()
         logger.add("bot.log", rotation="1 day", level="INFO")
 
@@ -82,7 +86,7 @@ class VolumePumpBot:
 
     def _calculate_limit_price(self, current_price, side, rounding_step=0.01):
         """Рассчитать цену лимитного ордера с учетом шага цены."""
-        adjustment = current_price * 0.0001
+        adjustment = current_price * self.limit_order_diff
         if side == "buy":
             limit_price = current_price - adjustment
         elif side == "sell":
@@ -94,7 +98,7 @@ class VolumePumpBot:
         return round(limit_price - (limit_price % rounding_step), 2)
 
 
-    async def _wait_until_filled(self, order_id=None, symbol=None, size=None,  side=None, timeout=20):
+    async def _wait_until_filled(self, order_id=None, symbol=None, size=None,  side=None):
         start_time = datetime.now()
         while True:
             try:
@@ -104,8 +108,8 @@ class VolumePumpBot:
                     break
 
                 elapsed_time = (datetime.now() - start_time).total_seconds()
-                if elapsed_time >= timeout:
-                    logger.warning(f"Ордер {order_id} для {symbol} не заполнился за {timeout} секунд. Переустановка ордера.")
+                if elapsed_time >= self.limit_hold_time:
+                    logger.warning(f"Ордер {order_id} для {symbol} не заполнился за {self.limit_hold_time} секунд. Переустановка ордера.")
                     self.api.cancel_orders()
                     
                     current_price = self.api.get_market_price(symbol)

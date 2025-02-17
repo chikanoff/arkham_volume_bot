@@ -20,6 +20,8 @@ async def main():
     leverage = config["leverage"]
     perp_target_volume = config["perp_target_volume"]
     hold_time = config["hold_time"]
+    limit_order_diff = config["limit_order_diff"]
+    limit_hold_time = config["limit_hold_time"]
     tasks = []
 
     # тикеры
@@ -64,7 +66,9 @@ async def main():
             slippage=slippage, 
             is_perpetual=is_perpetual, 
             leverage=leverage,
-            hold_time=hold_time
+            hold_time=hold_time,
+            limit_order_diff=limit_order_diff,
+            limit_hold_time=limit_hold_time
         )
         tasks.append(bot.run())
 
