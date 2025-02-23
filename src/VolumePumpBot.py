@@ -138,7 +138,7 @@ class VolumePumpBot:
             logger.error(f"Не удалось получить цену для {symbol}.")
             return
 
-        size = (balance * self.leverage / current_price) if self.is_perpetual else (balance * 0.98 / current_price)
+        size = (balance * 0.95 * self.leverage / current_price) if self.is_perpetual else (balance * 0.95 / current_price)
         size = round(size - (size % self.symbols[symbol]["rounding_step"]), 10)
 
         limit_price = self._calculate_limit_price(current_price, side="buy", rounding_step=self.symbols[symbol]["rounding_step"])
