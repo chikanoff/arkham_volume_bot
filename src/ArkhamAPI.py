@@ -14,7 +14,7 @@ class ArkhamAPI:
         self.api_secret = api_secret
         self.base_url = "https://arkm.com/api"
         self.proxies = proxies
-        logger.add("arkham_api.log", rotation="1 day", level="INFO")
+        logger.add("logs/arkham_api.log", rotation="1 day", level="INFO")
 
     def generate_signature(self, method, path, body, expires):
         message = f"{self.api_key}{expires}{method}{path}{body}"

@@ -35,7 +35,7 @@ class VolumePumpBot:
         self.limit_order_diff= limit_order_diff
         self.limit_hold_time = limit_hold_time
         self._setup_db()
-        logger.add("bot.log", rotation="1 day", level="INFO")
+        logger.add("logs/bot.log", rotation="1 day", level="INFO")
 
     def _setup_db(self):
         conn = sqlite3.connect(self.db_path)
